@@ -1,6 +1,6 @@
 Vagrant.configure("2") do |config|
 
-    base_hostname = "plamen-node"
+    hostname = "plamen-node"
     cpus = 2
     memory = 1024
     interface = "eno1"
@@ -10,10 +10,10 @@ Vagrant.configure("2") do |config|
     config.vm.network "public_network", bridge: "#{interface}"
 
     (1..nodes).each do |i|
-        config.vm.define "#{base_hostname}#{i}" do |node|
+        config.vm.define "#{hostname}#{i}" do |node|
             config.vm.provider "virtualbox" do |vb|
 
-                config.vm.hostname = "#{base_hostname}#{i}"
+                config.vm.hostname = "#{hostname}#{i}"
 
                 vb.gui = false
                 vb.name = config.vm.hostname
