@@ -60,5 +60,11 @@ Vagrant.configure("2") do |config|
             end
         end
     end
+
+    # Enable remote root access
+    config.vm.provision "shell", inline: <<-SHELL
+        sed -ie 's/^PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+        service sshd reload
+    SHELL
 end
 # vim: ft=ruby:ai:ts=4:sw=4:sts=4
