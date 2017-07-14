@@ -1,0 +1,89 @@
+Vagrant.configure("2") do |config|
+
+    hostname = "plamen-vagrant"
+    cpus = 2
+    memory = 1024
+    interface = "eno1"
+    nodes = 2
+
+    config.vm.box = "centos/6"
+    config.vm.network "public_network", bridge: "#{interface}"
+
+    VAGRANT_ROOT = File.dirname(__FILE__)
+    ANSIBLE_RAW_SSH_ARGS = []
+
+    (1..nodes).each do |i|
+
+        n = i if nodes > 1
+        ANSIBLE_RAW_SSH_ARGS << "-o IdentityFile=#{VAGRANT_ROOT}/.vagrant/machines/#{hostname}#{i}/virtualbox/private_key"
+
+        config.vm.define "#{hostname}#{n}" do |node|
+            config.vm.provider "virtualbox" do |vb|
+
+                config.vm.hostname = "#{hostname}#{n}"
+
+                vb.gui = false
+                vb.name = config.vm.hostname
+
+                # General
+                vb.customize ["modifyvm", :id, "--clipboard", "bidirectional"]
+                vb.customize ["modifyvm", :id, "--draganddrop", "bidirectional"]
+
+                # System
+                vb.memory = memory
+                vb.customize ["modifyvm", :id, "--boot1", "disk"]
+                vb.customize ["modifyvm", :id, "--boot2", "dvd"]
+                vb.customize ["modifyvm", :id, "--boot3", "none"]
+                vb.customize ["modifyvm", :id, "--boot4", "none"]
+                vb.customize ["modifyvm", :id, "--chipset", "ich9"]
+                vb.customize ["modifyvm", :id, "--mouse", "ps2"]
+                vb.customize ["modifyvm", :id, "--apic", "on"]
+                vb.customize ["modifyvm", :id, "--rtcuseutc", "on"]
+                vb.cpus = cpus
+                vb.customize ["modifyvm", :id, "--pae", "on"]
+                vb.customize ["modifyvm", :id, "--paravirtprovider", "default"]
+                vb.customize ["modifyvm", :id, "--hwvirtex", "on"]
+                vb.customize ["modifyvm", :id, "--vtxvpid", "on"]
+                vb.customize ["modifyvm", :id, "--vtxux", "on"]
+
+                # Display
+                vb.customize ["modifyvm", :id, "--vram", "16"]
+                vb.customize ["modifyvm", :id, "--accelerate3d", "on"]
+
+                # Storage
+                vb.customize ["storagectl", :id, "--name", "IDE", "--controller", "ICH6", "--hostiocache", "on"]
+                vb.customize ["storageattach", :id, "--storagectl", "IDE", "--port", "0", "--device", "0", "--type", "hdd", "--nonrotational", "on"]
+
+                # Audio
+                vb.customize ["modifyvm", :id, "--audio", "none"]
+
+                # Network
+                vb.customize ["modifyvm", :id, "--nictype1", "82540EM"]
+
+                # USB
+                vb.customize ["modifyvm", :id, "--usb", "on", "--usbehci", "on"]
+            end
+
+            # Enable remote root access
+            config.vm.provision "shell", inline: <<-SHELL
+                sed -ie 's/^PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+                service sshd reload
+            SHELL
+
+            # Ansible provisioner
+            if i == nodes
+                config.vm.provision "ansible" do |ansible|
+                    ansible.limit = [ "group", "localhost" ]
+                    ansible.playbook = "playbook.yml"
+                    ansible.inventory_path = "inventory/hosts"
+                    ansible.sudo = true
+                    #ansible.ask_vault_pass = true
+                    ansible.vault_password_file = "~/.vault_passwd"
+                    ansible.raw_ssh_args = ANSIBLE_RAW_SSH_ARGS
+                end
+            end
+        end
+    end
+end
+# vim: ft=ruby:ai:ts=4:sw=4:sts=4
+
