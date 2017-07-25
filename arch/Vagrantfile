@@ -15,9 +15,10 @@ Vagrant.configure("2") do |config|
         n = i if nodes > 1
 
         config.vm.define "#{hostname}#{n}" do |node|
-            config.vm.provider "virtualbox" do |vb|
 
-                config.vm.hostname = "#{hostname}#{n}"
+            node.vm.hostname = "#{hostname}#{n}"
+
+            config.vm.provider "virtualbox" do |vb|
 
                 vb.gui = false
                 vb.name = config.vm.hostname
