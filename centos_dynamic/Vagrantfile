@@ -1,36 +1,60 @@
-HOSTNAME = "plamen-centos"
 CPUS = 2
-MEMORY = 1024
+MEMORY = 4096
 INTERFACE = ""
-NODES = 1
+HOSTNAME = "centos-node"
+NODES = 2
+
+VAULT_PASS_FILE = "#{ENV['HOME']}/.vault_passwd"
 
 Vagrant.configure("2") do |config|
 
-    config.vm.box = "centos/6"
+    config.vm.box = "centos/7"
     config.vm.synced_folder '.', '/vagrant', disabled: true
 
+    VAGRANT_ROOT = File.dirname(__FILE__)
+    ANSIBLE_RAW_SSH_ARGS = []
+
+    count = NODES
     (1..NODES).each do |i|
 
         n = i if NODES > 1
+        ANSIBLE_RAW_SSH_ARGS << "-o IdentityFile=#{VAGRANT_ROOT}/.vagrant/machines/#{HOSTNAME}#{n}/virtualbox/private_key"
 
         config.vm.define "#{HOSTNAME}#{n}" do |node|
 
             node.vm.hostname = "#{HOSTNAME}#{n}"
 
             if INTERFACE.to_s.empty?
-                node.vm.network :private_network, ip: "10.19.0.#{i + 1}"
+                node.vm.network :private_network, ip: "10.19.0.#{i + 1}", netmask: "255.255.255.0"
             else
-                node.vm.network "public_network", bridge: "#{INTERFACE}"
+                node.vm.network :public_network, bridge: "#{INTERFACE}"
             end
 
-            node.vm.provider "virtualbox" do |vb|
+            node.vm.provider :virtualbox do |vb|
                 vb.name = node.vm.hostname
+            end
+
+            # Ansible provisioner
+            count -= 1
+            if count == 0
+                node.vm.provision :ansible do |ansible|
+                    ansible.limit = "all"
+                    ansible.playbook = "ansible.yml"
+                    ansible.become = true
+                    ansible.become_user = "root"
+                    ansible.raw_ssh_args = ANSIBLE_RAW_SSH_ARGS
+                    if File.exist?(VAULT_PASS_FILE)
+                        ansible.vault_password_file = VAULT_PASS_FILE
+                    else
+                        ansible.ask_vault_pass = true
+                    end
+                end
             end
         end
     end
 
     # Provider: virtualbox
-    config.vm.provider "virtualbox" do |vb|
+    config.vm.provider :virtualbox do |vb|
 
         vb.gui = false
 
@@ -74,9 +98,19 @@ Vagrant.configure("2") do |config|
     end
 
     # Shell provisioner: Enable remote root access
-    config.vm.provision "shell", inline: <<-SHELL
+    config.vm.provision :shell, inline: <<-SHELL
         sed -i -e 's/^PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
-        service sshd reload
+        sed -i -e 's/^#MaxAuthTries.*/MaxAuthTries #{NODES}/g' /etc/ssh/sshd_config
+        centos_version=$(rpm -q centos-release | cut -d "-" -f 3)
+        echo "Reload sshd (CentOS $centos_version)"
+        if [[ "$centos_version" == "7" ]]; then
+            systemctl reload sshd.service
+        elif [[ "$centos_version" == "6" ]]; then
+            service sshd reload
+        else
+            echo "Unable to reload sshd: Unknown CentOS version"
+        fi
+        echo "--> Server reporting for duty."
     SHELL
 end
 # vim: ft=ruby:ai:ts=4:sw=4:sts=4

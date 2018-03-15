@@ -1,0 +1,53 @@
+---
+- name: Run Ansible
+  hosts: all
+  become: true
+  gather_facts: yes
+  vars:
+    centos: "{{ ansible_distribution_version[0:1] }}"
+  tasks:
+  - name: Print OS version
+    debug:
+      msg: "Host: {{ ansible_hostname }} ({{ ansible_distribution }} {{ ansible_distribution_release }} {{ ansible_distribution_version }})"
+
+
+  - name: Install EPEL repository
+    yum:
+      name: "epel-release"
+      state: present
+
+  - name: Install some tools
+    yum:
+      name: "{{ item }}"
+      state: present
+    with_items:
+      - vim
+      - iotop
+      - iftop
+      - htop
+      - bash-completion
+      - libselinux-python
+      - tmux
+      - wget
+      - telnet
+      - bind-utils
+      - yum-utils
+      - net-tools
+
+  - name: Update all packages
+    yum:
+      name: '*'
+      state: latest
+
+  - name: Set SELinux to permissive mode
+    selinux:
+      state: permissive
+      policy: targeted
+
+  - name: Reboot
+    shell: sleep 2 && shutdown -r now "Ansible reboot"
+    async: 1
+    poll: 0
+    become: true
+    ignore_errors: true
+
