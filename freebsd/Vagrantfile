@@ -3,6 +3,7 @@ CPUS = 2
 MEMORY = 1024
 INTERFACE = ""
 NODES = 1
+DOMAIN = ""
 
 Vagrant.configure("2") do |config|
 
@@ -17,7 +18,11 @@ Vagrant.configure("2") do |config|
 
         config.vm.define "#{HOSTNAME}#{n}" do |node|
 
-            node.vm.hostname = "#{HOSTNAME}#{n}"
+            if DOMAIN.nil? || DOMAIN.empty?
+                node.vm.hostname = "#{HOSTNAME}#{n}"
+            else
+                node.vm.hostname = "#{HOSTNAME}#{n}.#{DOMAIN}"
+            end
 
             if INTERFACE.to_s.empty?
                 node.vm.network :private_network, ip: "10.19.0.#{i + 1}"
